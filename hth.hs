@@ -1,4 +1,6 @@
+import GHC.IO.Handle (hFlush)
 import System.Exit (exitSuccess)
+import System.IO (stdout)
 import Text.Parsec
 import Text.Parsec.Char
 
@@ -97,7 +99,9 @@ evalExpr input = case input of
   _ -> putStrLn "Unimplemented"
 
 main :: IO ()
-main = do
-  input <- getLine
-  evalExpr $ parseExpr input
-  main
+main =
+  putStr "hth> " >>=
+  \_ -> hFlush stdout >>=
+  \_ -> getLine >>=
+  \input -> (evalExpr $ parseExpr input) >>=
+  \_ -> main
