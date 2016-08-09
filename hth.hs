@@ -1,3 +1,4 @@
+import System.Exit (exitSuccess)
 import Text.Parsec
 import Text.Parsec.Char
 
@@ -12,6 +13,7 @@ data Command =
   Monthly String |
   QuitUnsafe |
   Quit |
+  ParseFailure |
   Rename Int String |
   Renumber |
   Retime Int |
@@ -85,8 +87,17 @@ command =
 parseExpr :: String -> Command
 parseExpr input =
   case parse command "stdin" input of
-    Left err -> error "Unrecgonised/incomplete command"
+    Left err -> ParseFailure
     Right expr -> expr
 
+evalExpr :: Command -> IO ()
+evalExpr input = case input of
+  ParseFailure -> putStrLn "Unrecgonised/incomplete command"
+  QuitUnsafe -> exitSuccess
+  _ -> putStrLn "Unimplemented"
+
 main :: IO ()
-main = return ()
+main = do
+  input <- getLine
+  evalExpr $ parseExpr input
+  main
