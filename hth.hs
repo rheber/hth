@@ -87,3 +87,6 @@ parseExpr input =
   case parse command "stdin" input of
     Left err -> error "Unrecgonised/incomplete command"
     Right expr -> expr
+
+main :: IO ()
+main = return ()
