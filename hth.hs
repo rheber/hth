@@ -1,3 +1,4 @@
+import qualified Data.Map.Lazy as Map
 import GHC.IO.Handle (hFlush)
 import System.Exit (exitSuccess)
 import System.IO (stdout)
@@ -6,6 +7,8 @@ import Text.Parsec.Char
 
 type Parser a = Parsec String () a
 data TimePeriod = AnyTime | Week | Month deriving Show
+data Task = Task String TimePeriod
+data HTHState = HTHState Int (Map.Map Int Task)
 
 data Command =
   Delete Int |
@@ -86,22 +89,32 @@ command =
   save <|>
   weekly
 
+--addTask :: Task -> IO HTHState
+
 parseExpr :: String -> Command
 parseExpr input =
   case parse command "stdin" input of
     Left err -> ParseFailure
     Right expr -> expr
 
-evalExpr :: Command -> IO ()
-evalExpr input = case input of
-  ParseFailure -> putStrLn "Unrecgonised/incomplete command"
+evalExpr :: HTHState -> Command -> IO HTHState
+evalExpr st input = case input of
+  ParseFailure -> putStrLn "Unrecgonised/incomplete command" >> return st
   QuitUnsafe -> exitSuccess
-  _ -> putStrLn "Unimplemented"
+  _ -> putStrLn "Unimplemented" >> return st
 
-main :: IO ()
-main =
-  putStr "hth> " >>=
-  \_ -> hFlush stdout >>=
-  \_ -> getLine >>=
-  \input -> (evalExpr $ parseExpr input) >>=
-  \_ -> main
+setup :: IO HTHState
+setup = do
+  let tasks = Map.empty
+  return $ HTHState 1 tasks
+
+repl :: HTHState -> IO HTHState
+repl st =
+  putStr "hth> " >>
+  hFlush stdout >>
+  getLine >>=
+  \input -> (evalExpr st $ parseExpr input) >>=
+  \newState -> repl newState
+
+main :: IO HTHState
+main = setup >>= \s -> repl s
