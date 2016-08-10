@@ -6,7 +6,7 @@ import Text.Parsec
 import Text.Parsec.Char
 
 type Parser a = Parsec String () a
-data TimePeriod = AnyTime | Week | Month deriving Show
+data TimePeriod = AnyTime | Week | Month deriving Eq
 data Task = Task String TimePeriod
 data HTHState = HTHState Int (Map.Map Int Task)
 
@@ -24,7 +24,6 @@ data Command =
   Retime Int |
   Save |
   Weekly String
-  deriving Show
 
 integer :: Parser Int
 integer = fmap read $ many1 digit
@@ -89,7 +88,17 @@ command =
   save <|>
   weekly
 
---addTask :: Task -> IO HTHState
+addTask :: HTHState -> Task -> IO HTHState
+addTask (HTHState n m) task =
+  return $ HTHState (n + 1) $ Map.insert n task m
+
+listTask :: Int -> Task -> IO ()
+listTask n (Task name _) = putStrLn $ show n ++ " [ ] " ++ name
+
+listTasks :: HTHState -> TimePeriod -> IO HTHState
+listTasks st@(HTHState _ m) AnyTime = Map.traverseWithKey listTask m >> return st
+listTasks st@(HTHState _ m) p =
+  Map.traverseWithKey listTask (Map.filter (\(Task _ q) -> q == p) m) >> return st
 
 parseExpr :: String -> Command
 parseExpr input =
@@ -99,8 +108,11 @@ parseExpr input =
 
 evalExpr :: HTHState -> Command -> IO HTHState
 evalExpr st input = case input of
+  List p -> listTasks st p
+  Monthly name -> addTask st $ Task name Month
   ParseFailure -> putStrLn "Unrecgonised/incomplete command" >> return st
   QuitUnsafe -> exitSuccess
+  Weekly name -> addTask st $ Task name Week
   _ -> putStrLn "Unimplemented" >> return st
 
 setup :: IO HTHState
