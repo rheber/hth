@@ -100,10 +100,10 @@ addTask (HTHState n m) task =
   return $ HTHState (n + 1) $ Map.insert n task m
 
 listTask :: Int -> Task -> IO ()
-listTask n (Task name p date) = do
+listTask n (Task name p deadline) = do
   now <- getCurrentTime
   putStrLn $ show n ++ " [" ++
-    (if now > timeAfter p date then "X" else " ") ++
+    (if now < deadline then "X" else " ") ++
     "] " ++ name
 
 listTasks :: HTHState -> TimePeriod -> IO HTHState
@@ -111,6 +111,11 @@ listTasks st@(HTHState _ m) AnyTime = Map.traverseWithKey listTask m >> return s
 listTasks st@(HTHState _ m) p =
   Map.traverseWithKey listTask (Map.filter (\(Task _ q  _) -> q == p) m) >>
   return st
+
+markTask :: HTHState -> Int -> IO HTHState
+markTask (HTHState i m) n = let
+  modify (Task s p t) = Task s p $ timeAfter p t
+  in return $ HTHState i $ Map.adjust modify n m
 
 parseExpr :: String -> Command
 parseExpr input =
@@ -123,10 +128,11 @@ evalExpr st input = do
   now <- getCurrentTime
   case input of
     List p -> listTasks st p
-    Monthly name -> addTask st $ Task name Month $ timeAfter Month now
+    Mark n -> markTask st n
+    Monthly name -> addTask st $ Task name Month now
     ParseFailure -> putStrLn "Unrecgonised/incomplete command" >> return st
     QuitUnsafe -> exitSuccess
-    Weekly name -> addTask st $ Task name Week $ timeAfter Week now
+    Weekly name -> addTask st $ Task name Week now
     _ -> putStrLn "Unimplemented" >> return st
 
 setup :: IO HTHState
