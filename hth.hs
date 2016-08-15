@@ -7,8 +7,8 @@ import Text.Parsec
 import Text.Parsec.Char
 
 type Parser a = Parsec String () a
-data TimePeriod = AnyTime | Week | Month deriving Eq
-data Task = Task String TimePeriod UTCTime
+data TimePeriod = AnyTime | Week | Month deriving (Eq, Show)
+data Task = Task String TimePeriod UTCTime deriving Show
 data HTHState = HTHState Int (Map.Map Int Task)
 
 data Command =
@@ -117,6 +117,11 @@ markTask (HTHState i m) n = let
   modify (Task s p t) = Task s p $ timeAfter p t
   in return $ HTHState i $ Map.adjust modify n m
 
+saveTasks :: HTHState -> IO HTHState
+saveTasks st@(HTHState _ m) =
+  writeFile "habits" (concatMap (++ "\n") $ show <$> m) >>
+  return st
+
 parseExpr :: String -> Command
 parseExpr input =
   case parse command "stdin" input of
@@ -132,6 +137,7 @@ evalExpr st input = do
     Monthly name -> addTask st $ Task name Month now
     ParseFailure -> putStrLn "Unrecgonised/incomplete command" >> return st
     QuitUnsafe -> exitSuccess
+    Save -> saveTasks st
     Weekly name -> addTask st $ Task name Week now
     _ -> putStrLn "Unimplemented" >> return st
 
