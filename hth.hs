@@ -7,8 +7,8 @@ import Text.Parsec
 import Text.Parsec.Char
 
 type Parser a = Parsec String () a
-data TimePeriod = AnyTime | Week | Month deriving (Eq, Show)
-data Task = Task String TimePeriod UTCTime deriving Show
+data TimePeriod = AnyTime | Week | Month deriving (Eq, Read, Show)
+data Task = Task String TimePeriod UTCTime deriving (Read, Show)
 data HTHState = HTHState Int (Map.Map Int Task)
 
 data Command =
@@ -141,10 +141,19 @@ evalExpr st input = do
     Weekly name -> addTask st $ Task name Week now
     _ -> putStrLn "Unimplemented" >> return st
 
+keepLoading :: HTHState -> [Task] -> IO HTHState
+keepLoading st [] = return st
+keepLoading st (t:ts) = addTask st t >>= \s -> keepLoading st ts
+
+loadTasks :: HTHState -> IO HTHState
+loadTasks st = do
+  tasks <- readFile "habits"
+  keepLoading st $ read <$> lines tasks
+
 setup :: IO HTHState
 setup = do
   let tasks = Map.empty
-  return $ HTHState 1 tasks
+  loadTasks $ HTHState 1 tasks
 
 repl :: HTHState -> IO HTHState
 repl st =
