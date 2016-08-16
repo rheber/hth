@@ -1,5 +1,3 @@
-module Hth where
-
 import qualified Data.Map.Lazy as Map
 import Data.Time
 import GHC.IO.Handle (hFlush)
@@ -27,8 +25,9 @@ data Command =
   Retime Int |
   Save |
   Weekly String
+  deriving Show
 
-secsPerDay = 1000 * 24 * 60
+secsPerDay = 24 * 60 * 60
 
 timeAfter :: TimePeriod -> UTCTime -> UTCTime
 timeAfter Week = addUTCTime (7 * secsPerDay)
@@ -98,8 +97,10 @@ command =
   weekly
 
 addTask :: HTHState -> Task -> IO HTHState
-addTask (HTHState n m) task =
-  return $ HTHState (n + 1) $ Map.insert n task m
+addTask (HTHState n m) task = return $ HTHState (n + 1) $ Map.insert n task m
+
+deleteTask :: HTHState -> Int -> IO HTHState
+deleteTask (HTHState i m) n = return $ HTHState i $ Map.delete n m
 
 listTask :: Int -> Task -> IO ()
 listTask n (Task name p deadline) = do
@@ -134,6 +135,7 @@ evalExpr :: HTHState -> Command -> IO HTHState
 evalExpr st input = do
   now <- getCurrentTime
   case input of
+    Delete n -> deleteTask st n
     List p -> listTasks st p
     Mark n -> markTask st n
     Monthly name -> addTask st $ Task name Month now
