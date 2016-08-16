@@ -1,3 +1,5 @@
+module Hth where
+
 import qualified Data.Map.Lazy as Map
 import Data.Time
 import GHC.IO.Handle (hFlush)
@@ -9,7 +11,7 @@ import Text.Parsec.Char
 type Parser a = Parsec String () a
 data TimePeriod = AnyTime | Week | Month deriving (Eq, Read, Show)
 data Task = Task String TimePeriod UTCTime deriving (Read, Show)
-data HTHState = HTHState Int (Map.Map Int Task)
+data HTHState = HTHState Int (Map.Map Int Task) deriving Show
 
 data Command =
   Delete Int |
@@ -143,7 +145,7 @@ evalExpr st input = do
 
 keepLoading :: HTHState -> [Task] -> IO HTHState
 keepLoading st [] = return st
-keepLoading st (t:ts) = addTask st t >>= \s -> keepLoading st ts
+keepLoading st (t:ts) = addTask st t >>= \new -> keepLoading new ts
 
 loadTasks :: HTHState -> IO HTHState
 loadTasks st = do
