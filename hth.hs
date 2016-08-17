@@ -1,3 +1,5 @@
+import Control.Exception hiding (try)
+import Control.Monad (foldM)
 import qualified Data.Map.Lazy as Map
 import Data.Time
 import GHC.IO.Handle (hFlush)
@@ -145,14 +147,10 @@ evalExpr st input = do
     Weekly name -> addTask st $ Task name Week now
     _ -> putStrLn "Unimplemented" >> return st
 
-keepLoading :: HTHState -> [Task] -> IO HTHState
-keepLoading st [] = return st
-keepLoading st (t:ts) = addTask st t >>= \new -> keepLoading new ts
-
 loadTasks :: HTHState -> IO HTHState
 loadTasks st = do
-  tasks <- readFile "habits"
-  keepLoading st $ read <$> lines tasks
+  tasks <- catch (readFile "habits") (\(SomeException _) -> return "")
+  foldM addTask st $ read <$> lines tasks
 
 setup :: IO HTHState
 setup = do
