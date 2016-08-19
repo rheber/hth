@@ -29,11 +29,19 @@ data Command =
   Weekly String
   deriving Show
 
+{- Time functions. -}
+
 secsPerDay = 24 * 60 * 60
 
 timeAfter :: TimePeriod -> UTCTime -> UTCTime
 timeAfter Week = addUTCTime (7 * secsPerDay)
 timeAfter Month = addUTCTime (30 * secsPerDay)
+
+-- Whether a task is overdue.
+isUrgent :: UTCTime -> Task -> Bool
+isUrgent now (Task _ p t) = timeAfter p t < now
+
+{- Parsers for basic types. -}
 
 integer :: Parser Int
 integer = fmap read $ many1 digit
@@ -46,6 +54,8 @@ timePeriod =
   string "all" *> pure AnyTime <|>
   string "monthly" *> pure Month <|>
   string "weekly" *> pure Week
+
+{- Parsers for commands. -}
 
 delete :: Parser Command
 delete = Delete <$> (string "delete " *> integer)
@@ -98,6 +108,8 @@ command =
   save <|>
   weekly
 
+{- Functions which implement commands. -}
+
 addTask :: HTHState -> Task -> IO HTHState
 addTask (HTHState n m) task = return $ HTHState (n + 1) $ Map.insert n task m
 
@@ -127,6 +139,8 @@ saveTasks st@(HTHState _ m) =
   writeFile "habits" (concatMap (++ "\n") $ show <$> m) >>
   return st
 
+{- Setup and repl functions. -}
+
 parseExpr :: String -> Command
 parseExpr input =
   case parse command "stdin" input of
@@ -147,10 +161,17 @@ evalExpr st input = do
     Weekly name -> addTask st $ Task name Week now
     _ -> putStrLn "Unimplemented" >> return st
 
+announce :: Task -> IO Task
+announce task@(Task name _ _) = do
+  now <- getCurrentTime
+  if isUrgent now task then putStrLn ("Outstanding task: " ++ name) else return ()
+  return task
+
 loadTasks :: HTHState -> IO HTHState
 loadTasks st = do
-  tasks <- catch (readFile "habits") (\(SomeException _) -> return "")
-  foldM addTask st $ read <$> lines tasks
+  taskString <- catch (readFile "habits") (\(SomeException _) -> return "")
+  taskStrings <- sequence $ announce <$> read <$> lines taskString
+  foldM addTask st taskStrings
 
 setup :: IO HTHState
 setup = do
