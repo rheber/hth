@@ -122,6 +122,24 @@ addTask (HTHState i _ m) t = return $ HTHState (i + 1) True $ Map.insert i t m
 deleteTask :: HTHState -> Int -> IO HTHState
 deleteTask (HTHState i _ m) n = return $ HTHState i True $ Map.delete n m
 
+helpPrint :: IO ()
+helpPrint = do
+  putStrLn ""
+  putStrLn "Commands:"
+  putStrLn "delete <number>\t\tDelete task"
+  putStrLn "help\t\t\tDisplay this message"
+  putStrLn "list all/monthly/weekly List tasks in specified category"
+  putStrLn "mark <number>\t\tMark task as having been done recently"
+  putStrLn "monthly <name>\t\tAdd new monthly task"
+  putStrLn "quit\t\t\tQuit if there are no unsaved changes"
+  putStrLn "quit!\t\t\tQuit without saving"
+  putStrLn "rename <number> <name>\tGive a task a new name"
+  putStrLn "renumber\t\tReset task numbering (happens automatically on exit)"
+  putStrLn "retime <number>\t\tChange a monthly task to weekly and vice versa"
+  putStrLn "save\t\t\tSave any changes"
+  putStrLn "weekly <name>\t\tAdd new weekly task"
+  putStrLn ""
+
 listTask :: Int -> Task -> IO ()
 listTask n (Task name p deadline) = do
   now <- getCurrentTime
@@ -178,6 +196,7 @@ evalExpr st input = do
   now <- getCurrentTime
   case input of
     Delete n -> deleteTask st n
+    Help -> helpPrint >> return st
     List p -> listTasks st p
     Mark n -> markTask st n
     Monthly name -> addTask st $ Task name Month now
@@ -189,7 +208,7 @@ evalExpr st input = do
     Retime n -> retimeTask st n
     Save -> saveTasks st
     Weekly name -> addTask st $ Task name Week now
-    _ -> putStrLn "Unimplemented" >> return st
+--    _ -> putStrLn "Unimplemented" >> return st
 
 announce :: Task -> IO Task
 announce task@(Task name _ _) = do
