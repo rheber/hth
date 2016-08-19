@@ -146,6 +146,9 @@ quitSafe st =
   then putStrLn "Unsaved changes, either 'save' or 'quit!'" >> return st
   else exitSuccess
 
+renumberTasks :: HTHState -> IO HTHState
+renumberTasks st = foldM addTask (HTHState 1 True Map.empty) $ taskMap st
+
 saveTasks :: HTHState -> IO HTHState
 saveTasks st =
   writeFile "habits" (concatMap (++ "\n") $ show <$> taskMap st) >>
@@ -170,6 +173,7 @@ evalExpr st input = do
     ParseFailure -> putStrLn "Unrecgonised/incomplete command" >> return st
     QuitUnsafe -> exitSuccess
     Quit -> quitSafe st
+    Renumber -> renumberTasks st
     Save -> saveTasks st
     Weekly name -> addTask st $ Task name Week now
     _ -> putStrLn "Unimplemented" >> return st
@@ -184,13 +188,11 @@ loadTasks :: HTHState -> IO HTHState
 loadTasks st = do
   taskString <- catch (readFile "habits") (\(SomeException _) -> return "")
   taskStrings <- sequence $ announce <$> read <$> lines taskString
-  st <- foldM addTask st taskStrings
-  return st{isModified = False}
+  new <- foldM addTask st taskStrings
+  return new{isModified = False}
 
 setup :: IO HTHState
-setup = do
-  let tasks = Map.empty
-  loadTasks $ HTHState 1 True tasks
+setup = loadTasks $ HTHState 1 True Map.empty
 
 repl :: HTHState -> IO HTHState
 repl st =
