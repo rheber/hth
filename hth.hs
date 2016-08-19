@@ -146,6 +146,11 @@ quitSafe st =
   then putStrLn "Unsaved changes, either 'save' or 'quit!'" >> return st
   else exitSuccess
 
+renameTask :: HTHState -> Int -> String -> IO HTHState
+renameTask (HTHState i _ m) n name = let
+  modify (Task _ p t) = Task name p t
+  in return $ HTHState i True $ Map.adjust modify n m
+
 renumberTasks :: HTHState -> IO HTHState
 renumberTasks st = foldM addTask (HTHState 1 True Map.empty) $ taskMap st
 
@@ -173,6 +178,7 @@ evalExpr st input = do
     ParseFailure -> putStrLn "Unrecgonised/incomplete command" >> return st
     QuitUnsafe -> exitSuccess
     Quit -> quitSafe st
+    Rename n s -> renameTask st n s
     Renumber -> renumberTasks st
     Save -> saveTasks st
     Weekly name -> addTask st $ Task name Week now
