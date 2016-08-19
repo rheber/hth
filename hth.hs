@@ -154,6 +154,12 @@ renameTask (HTHState i _ m) n name = let
 renumberTasks :: HTHState -> IO HTHState
 renumberTasks st = foldM addTask (HTHState 1 True Map.empty) $ taskMap st
 
+retimeTask :: HTHState -> Int -> IO HTHState
+retimeTask (HTHState i _ m) n = let
+  modify (Task s Week t) = Task s Month t
+  modify (Task s Month t) = Task s Week t
+  in return $ HTHState i True $ Map.adjust modify n m
+
 saveTasks :: HTHState -> IO HTHState
 saveTasks st =
   writeFile "habits" (concatMap (++ "\n") $ show <$> taskMap st) >>
@@ -180,6 +186,7 @@ evalExpr st input = do
     Quit -> quitSafe st
     Rename n s -> renameTask st n s
     Renumber -> renumberTasks st
+    Retime n -> retimeTask st n
     Save -> saveTasks st
     Weekly name -> addTask st $ Task name Week now
     _ -> putStrLn "Unimplemented" >> return st
