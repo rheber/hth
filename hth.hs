@@ -11,7 +11,13 @@ import Text.Parsec.Char
 type Parser a = Parsec String () a
 data TimePeriod = AnyTime | Week | Month deriving (Eq, Read, Show)
 data Task = Task String TimePeriod UTCTime deriving (Read, Show)
-data HTHState = HTHState Int (Map.Map Int Task) deriving Show
+
+-- Next task ID to be assigned, whether unsaved changes exist, the tasks.
+data HTHState = HTHState {
+  counter :: Int,
+  isModified :: Bool,
+  taskMap ::Map.Map Int Task
+} deriving Show
 
 data Command =
   Delete Int |
@@ -111,10 +117,10 @@ command =
 {- Functions which implement commands. -}
 
 addTask :: HTHState -> Task -> IO HTHState
-addTask (HTHState n m) task = return $ HTHState (n + 1) $ Map.insert n task m
+addTask (HTHState i _ m) t = return $ HTHState (i + 1) True $ Map.insert i t m
 
 deleteTask :: HTHState -> Int -> IO HTHState
-deleteTask (HTHState i m) n = return $ HTHState i $ Map.delete n m
+deleteTask (HTHState i _ m) n = return $ HTHState i True $ Map.delete n m
 
 listTask :: Int -> Task -> IO ()
 listTask n (Task name p deadline) = do
@@ -124,20 +130,26 @@ listTask n (Task name p deadline) = do
     "] " ++ name
 
 listTasks :: HTHState -> TimePeriod -> IO HTHState
-listTasks st@(HTHState _ m) AnyTime = Map.traverseWithKey listTask m >> return st
-listTasks st@(HTHState _ m) p =
+listTasks st@(HTHState _ _ m) AnyTime = Map.traverseWithKey listTask m >> return st
+listTasks st@(HTHState _ _ m) p =
   Map.traverseWithKey listTask (Map.filter (\(Task _ q  _) -> q == p) m) >>
   return st
 
 markTask :: HTHState -> Int -> IO HTHState
-markTask (HTHState i m) n = let
+markTask (HTHState i _ m) n = let
   modify (Task s p t) = Task s p $ timeAfter p t
-  in return $ HTHState i $ Map.adjust modify n m
+  in return $ HTHState i True $ Map.adjust modify n m
+
+quitSafe :: HTHState -> IO HTHState
+quitSafe st =
+  if isModified st
+  then putStrLn "Unsaved changes, either 'save' or 'quit!'" >> return st
+  else exitSuccess
 
 saveTasks :: HTHState -> IO HTHState
-saveTasks st@(HTHState _ m) =
-  writeFile "habits" (concatMap (++ "\n") $ show <$> m) >>
-  return st
+saveTasks st =
+  writeFile "habits" (concatMap (++ "\n") $ show <$> taskMap st) >>
+  return st{isModified = False}
 
 {- Setup and repl functions. -}
 
@@ -157,6 +169,7 @@ evalExpr st input = do
     Monthly name -> addTask st $ Task name Month now
     ParseFailure -> putStrLn "Unrecgonised/incomplete command" >> return st
     QuitUnsafe -> exitSuccess
+    Quit -> quitSafe st
     Save -> saveTasks st
     Weekly name -> addTask st $ Task name Week now
     _ -> putStrLn "Unimplemented" >> return st
@@ -171,12 +184,13 @@ loadTasks :: HTHState -> IO HTHState
 loadTasks st = do
   taskString <- catch (readFile "habits") (\(SomeException _) -> return "")
   taskStrings <- sequence $ announce <$> read <$> lines taskString
-  foldM addTask st taskStrings
+  st <- foldM addTask st taskStrings
+  return st{isModified = False}
 
 setup :: IO HTHState
 setup = do
   let tasks = Map.empty
-  loadTasks $ HTHState 1 tasks
+  loadTasks $ HTHState 1 True tasks
 
 repl :: HTHState -> IO HTHState
 repl st =
