@@ -154,9 +154,10 @@ listTasks st@(HTHState _ _ m) p =
   return st
 
 markTask :: HTHState -> Int -> IO HTHState
-markTask (HTHState i _ m) n = let
-  modify (Task s p t) = Task s p $ timeAfter p t
-  in return $ HTHState i True $ Map.adjust modify n m
+markTask (HTHState i _ m) n = do
+  now <- getCurrentTime
+  let modify (Task s p t) = Task s p $ timeAfter p now
+  return $ HTHState i True $ Map.adjust modify n m
 
 quitSafe :: HTHState -> IO HTHState
 quitSafe st =
