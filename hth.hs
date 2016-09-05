@@ -140,10 +140,14 @@ helpPrint = do
   putStrLn "weekly <name>\t\tAdd new weekly task"
   putStrLn ""
 
+pad :: Int -> String
+pad n | n < 10 = ' ':show n
+pad n = show n
+
 listTask :: Int -> Task -> IO ()
 listTask n (Task name p deadline) = do
   now <- getCurrentTime
-  putStrLn $ show n ++ " [" ++
+  putStrLn $ pad n ++ " [" ++
     (if now < deadline then "X" else " ") ++
     "] " ++ name
 
