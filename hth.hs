@@ -108,9 +108,8 @@ command :: Parser Command
 command =
   delete <|>
   help <|>
-  list <|>
   try mark <|>
-  monthly <|>
+  try monthly <|>
   try quitUnsafe <|>
   quit <|> -- "try" would be needed if there were another "e" command.
   try rename <|>
@@ -118,7 +117,8 @@ command =
   retime <|>
   try save <|>
   swap <|>
-  weekly
+  try weekly <|>
+  list -- comes after "weekly" and "monthly"
 
 {- Functions which implement commands. -}
 
