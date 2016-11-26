@@ -11,6 +11,7 @@ import Text.Parsec.Char
 type Parser a = Parsec String () a
 data TimePeriod = AnyTime | Week | Month deriving (Eq, Read, Show)
 data Task = Task String TimePeriod UTCTime deriving (Read, Show)
+dummyTask = Task "" AnyTime $ UTCTime (ModifiedJulianDay 0) $ secondsToDiffTime 0
 
 -- Next task ID to be assigned, whether unsaved changes exist, the tasks.
 data HTHState = HTHState {
@@ -32,6 +33,7 @@ data Command =
   Renumber |
   Retime Int |
   Save |
+  Swap Int Int |
   Weekly String
   deriving Show
 
@@ -96,6 +98,9 @@ retime = Retime <$> (string "retime " *> integer)
 save :: Parser Command
 save = string "save" *> pure Save
 
+swap :: Parser Command
+swap = Swap <$> (string "swap " *> integer) <* space <*> integer
+
 weekly :: Parser Command
 weekly = Weekly <$> (string "weekly " *> taskName)
 
@@ -111,7 +116,8 @@ command =
   try rename <|>
   try renumber <|>
   retime <|>
-  save <|>
+  try save <|>
+  swap <|>
   weekly
 
 {- Functions which implement commands. -}
@@ -137,6 +143,7 @@ helpPrint = do
   putStrLn "renumber\t\tReset task numbering (happens automatically on exit)"
   putStrLn "retime <number>\t\tChange a monthly task to weekly and vice versa"
   putStrLn "save\t\t\tSave any changes"
+  putStrLn "swap <number> <number>\tSwap two tasks"
   putStrLn "weekly <name>\t\tAdd new weekly task"
   putStrLn ""
 
@@ -188,6 +195,12 @@ saveTasks st =
   writeFile "habits" (concatMap (++ "\n") $ show <$> taskMap st) >>
   return st{isModified = False}
 
+swapTasks :: HTHState -> Int -> Int -> IO HTHState
+swapTasks (HTHState i _ m) a b = let
+  aTask = Map.findWithDefault dummyTask a m
+  bTask = Map.findWithDefault dummyTask b m
+  in return $ HTHState i True $ Map.insert a bTask $ Map.insert b aTask m
+
 {- Setup and repl functions. -}
 
 parseExpr :: String -> Command
@@ -212,6 +225,7 @@ evalExpr st input = do
     Renumber -> renumberTasks st
     Retime n -> retimeTask st n
     Save -> saveTasks st
+    Swap a b -> swapTasks st a b
     Weekly name -> addTask st $ Task name Week now
 --    _ -> putStrLn "Unimplemented" >> return st
 
