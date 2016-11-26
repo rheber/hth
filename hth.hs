@@ -70,7 +70,7 @@ help :: Parser Command
 help = string "help" *> pure Help
 
 list :: Parser Command
-list = List <$> (string "list " *> timePeriod)
+list = List <$> ((optional $ string "list ") *> timePeriod)
 
 mark :: Parser Command
 mark = Mark <$> (string "mark " *> integer)
