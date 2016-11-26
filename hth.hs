@@ -82,7 +82,7 @@ quitUnsafe :: Parser Command
 quitUnsafe = string "quit!" *> pure QuitUnsafe
 
 quit :: Parser Command
-quit = string "quit" *> pure Quit
+quit = (string "quit" <|> string "exit") *> pure Quit
 
 rename :: Parser Command
 rename = Rename <$> (string "rename " *> integer) <* space <*> taskName
@@ -107,7 +107,7 @@ command =
   try mark <|>
   monthly <|>
   try quitUnsafe <|>
-  quit <|>
+  quit <|> -- "try" would be needed if there were another "e" command.
   try rename <|>
   try renumber <|>
   retime <|>
