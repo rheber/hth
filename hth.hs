@@ -1,124 +1,28 @@
 import Control.Exception hiding (try)
 import Control.Monad (foldM)
+import Data.Time (UTCTime, getCurrentTime)
 import qualified Data.Map.Lazy as Map
-import Data.Time
 import GHC.IO.Handle (hFlush)
 import System.Exit (exitSuccess)
 import System.IO (stdout)
-import Text.Parsec
-import Text.Parsec.Char
 
-type Parser a = Parsec String () a
-data TimePeriod = AnyTime | Week | Month deriving (Eq, Read, Show)
+import Command
+import Parser (parseExpr)
+import Time (TimePeriod(..), dummyTime, timeAfter)
+
 data Task = Task String TimePeriod UTCTime deriving (Read, Show)
-dummyTask = Task "" AnyTime $ UTCTime (ModifiedJulianDay 0) $ secondsToDiffTime 0
+dummyTask = Task "" AnyTime dummyTime
 
 -- Next task ID to be assigned, whether unsaved changes exist, the tasks.
 data HTHState = HTHState {
   counter :: Int,
   isModified :: Bool,
-  taskMap ::Map.Map Int Task
+  taskMap :: Map.Map Int Task
 } deriving Show
-
-data Command =
-  Delete Int |
-  Help |
-  List TimePeriod |
-  Mark Int |
-  Monthly String |
-  QuitUnsafe |
-  Quit |
-  ParseFailure |
-  Rename Int String |
-  Renumber |
-  Retime Int |
-  Save |
-  Swap Int Int |
-  Weekly String
-  deriving Show
-
-{- Time functions. -}
-
-secsPerDay = 24 * 60 * 60
-
-timeAfter :: TimePeriod -> UTCTime -> UTCTime
-timeAfter Week = addUTCTime (7 * secsPerDay)
-timeAfter Month = addUTCTime (30 * secsPerDay)
 
 -- Whether a task is overdue.
 isUrgent :: UTCTime -> Task -> Bool
 isUrgent now (Task _ p t) = timeAfter p t < now
-
-{- Parsers for basic types. -}
-
-integer :: Parser Int
-integer = fmap read $ many1 digit
-
-taskName :: Parser String
-taskName = many1 anyChar
-
-timePeriod :: Parser TimePeriod
-timePeriod =
-  string "all" *> pure AnyTime <|>
-  string "monthly" *> pure Month <|>
-  string "weekly" *> pure Week
-
-{- Parsers for commands. -}
-
-delete :: Parser Command
-delete = Delete <$> (string "delete " *> integer)
-
-help :: Parser Command
-help = string "help" *> pure Help
-
-list :: Parser Command
-list = List <$> ((optional $ string "list ") *> timePeriod)
-
-mark :: Parser Command
-mark = Mark <$> (string "mark " *> integer)
-
-monthly :: Parser Command
-monthly = Monthly <$> (string "monthly " *> taskName)
-
-quitUnsafe :: Parser Command
-quitUnsafe = string "quit!" *> pure QuitUnsafe
-
-quit :: Parser Command
-quit = (string "quit" <|> string "exit") *> pure Quit
-
-rename :: Parser Command
-rename = Rename <$> (string "rename " *> integer) <* space <*> taskName
-
-renumber :: Parser Command
-renumber = string "renumber" *> pure Renumber
-
-retime :: Parser Command
-retime = Retime <$> (string "retime " *> integer)
-
-save :: Parser Command
-save = string "save" *> pure Save
-
-swap :: Parser Command
-swap = Swap <$> (string "swap " *> integer) <* space <*> integer
-
-weekly :: Parser Command
-weekly = Weekly <$> (string "weekly " *> taskName)
-
-command :: Parser Command
-command =
-  delete <|>
-  help <|>
-  try mark <|>
-  try monthly <|>
-  try quitUnsafe <|>
-  quit <|> -- "try" would be needed if there were another "e" command.
-  try rename <|>
-  try renumber <|>
-  retime <|>
-  try save <|>
-  swap <|>
-  try weekly <|>
-  list -- comes after "weekly" and "monthly"
 
 {- Functions which implement commands. -}
 
@@ -202,12 +106,6 @@ swapTasks (HTHState i _ m) a b = let
   in return $ HTHState i True $ Map.insert a bTask $ Map.insert b aTask m
 
 {- Setup and repl functions. -}
-
-parseExpr :: String -> Command
-parseExpr input =
-  case parse command "stdin" input of
-    Left err -> ParseFailure
-    Right expr -> expr
 
 evalExpr :: HTHState -> Command -> IO HTHState
 evalExpr st input = do
