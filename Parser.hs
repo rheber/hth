@@ -24,7 +24,7 @@ timePeriod =
 {- Parsers for commands. -}
 
 delete :: Parser Command
-delete = Delete <$> (string "delete " *> integer)
+delete = Delete <$> ((string "delete " <|> string "remove ") *> integer)
 
 help :: Parser Command
 help = string "help" *> pure Help
@@ -64,7 +64,7 @@ weekly = Weekly <$> (string "weekly " *> taskName)
 
 command :: Parser Command
 command =
-  delete <|>
+  try delete <|>
   help <|>
   try mark <|>
   try monthly <|>
