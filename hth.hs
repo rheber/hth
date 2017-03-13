@@ -1,5 +1,4 @@
 import Control.Exception hiding (try)
-import Control.Monad (foldM)
 import Data.Time (UTCTime, getCurrentTime)
 import qualified Data.Map.Lazy as Map
 import GHC.IO.Handle (hFlush)
@@ -26,11 +25,11 @@ isUrgent now (Task _ p t) = timeAfter p t < now
 
 {- Functions which implement commands. -}
 
-addTask :: HTHState -> Task -> IO HTHState
-addTask (HTHState i _ m) t = return $ HTHState (i + 1) True $ Map.insert i t m
+addTask :: HTHState -> Task -> HTHState
+addTask (HTHState i _ m) t = HTHState (i + 1) True $ Map.insert i t m
 
-deleteTask :: HTHState -> Int -> IO HTHState
-deleteTask (HTHState i _ m) n = return $ HTHState i True $ Map.delete n m
+deleteTask :: HTHState -> Int -> HTHState
+deleteTask (HTHState i _ m) n = HTHState i True $ Map.delete n m
 
 helpPrint :: IO ()
 helpPrint = do
@@ -55,24 +54,23 @@ pad :: Int -> String
 pad n | n < 10 = ' ':show n
 pad n = show n
 
-listTask :: Int -> Task -> IO ()
-listTask n (Task name p deadline) = do
-  now <- getCurrentTime
-  putStrLn $ pad n ++ " [" ++
-    (if now < deadline then "X" else " ") ++
-    "] " ++ name
+listTaskString :: Int -> String -> UTCTime -> UTCTime -> String
+listTaskString n name deadline now =
+  pad n ++ " [" ++ (if now < deadline then "X" else " ") ++ "] " ++ name
 
-listTasks :: HTHState -> TimePeriod -> IO HTHState
-listTasks st@(HTHState _ _ m) AnyTime = Map.traverseWithKey listTask m >> return st
-listTasks st@(HTHState _ _ m) p =
-  Map.traverseWithKey listTask (Map.filter (\(Task _ q  _) -> q == p) m) >>
-  return st
+listTask :: UTCTime -> Int -> Task -> IO ()
+listTask now n (Task name _ deadline) =
+  putStrLn $ listTaskString n name deadline now
 
-markTask :: HTHState -> Int -> IO HTHState
-markTask (HTHState i _ m) n = do
-  now <- getCurrentTime
-  let modify (Task s p t) = Task s p $ timeAfter p now
-  return $ HTHState i True $ Map.adjust modify n m
+listTasks :: HTHState -> TimePeriod -> UTCTime -> IO (Map.Map Int ())
+listTasks st@(HTHState _ _ m) AnyTime now = Map.traverseWithKey (listTask now) m
+listTasks st@(HTHState _ _ m) p now =
+  Map.traverseWithKey (listTask now) (Map.filter (\(Task _ q  _) -> q == p) m)
+
+markTask :: HTHState -> Int -> UTCTime -> HTHState
+markTask (HTHState i _ m) n now = let
+  modify (Task s p t) = Task s p $ timeAfter p now
+  in HTHState i True $ Map.adjust modify n m
 
 quitSafe :: HTHState -> IO HTHState
 quitSafe st =
@@ -80,30 +78,30 @@ quitSafe st =
   then putStrLn "Unsaved changes, either 'save' or 'quit!'" >> return st
   else exitSuccess
 
-renameTask :: HTHState -> Int -> String -> IO HTHState
+renameTask :: HTHState -> Int -> String -> HTHState
 renameTask (HTHState i _ m) n name = let
   modify (Task _ p t) = Task name p t
-  in return $ HTHState i True $ Map.adjust modify n m
+  in HTHState i True $ Map.adjust modify n m
 
-renumberTasks :: HTHState -> IO HTHState
-renumberTasks st = foldM addTask (HTHState 1 True Map.empty) $ taskMap st
+renumberTasks :: HTHState -> HTHState
+renumberTasks st = foldl addTask (HTHState 1 True Map.empty) $ taskMap st
 
-retimeTask :: HTHState -> Int -> IO HTHState
+retimeTask :: HTHState -> Int -> HTHState
 retimeTask (HTHState i _ m) n = let
   modify (Task s Week t) = Task s Month t
   modify (Task s Month t) = Task s Week t
-  in return $ HTHState i True $ Map.adjust modify n m
+  in HTHState i True $ Map.adjust modify n m
 
 saveTasks :: HTHState -> IO HTHState
 saveTasks st =
   writeFile "habits" (concatMap (++ "\n") $ show <$> taskMap st) >>
   return st{isModified = False}
 
-swapTasks :: HTHState -> Int -> Int -> IO HTHState
+swapTasks :: HTHState -> Int -> Int -> HTHState
 swapTasks (HTHState i _ m) a b = let
   aTask = Map.findWithDefault dummyTask a m
   bTask = Map.findWithDefault dummyTask b m
-  in return $ HTHState i True $ Map.insert a bTask $ Map.insert b aTask m
+  in HTHState i True $ Map.insert a bTask $ Map.insert b aTask m
 
 {- Setup and repl functions. -}
 
@@ -111,20 +109,20 @@ evalExpr :: HTHState -> Command -> IO HTHState
 evalExpr st input = do
   now <- getCurrentTime
   case input of
-    Delete n -> deleteTask st n
+    Delete n -> return $ deleteTask st n
     Help -> helpPrint >> return st
-    List p -> listTasks st p
-    Mark n -> markTask st n
-    Monthly name -> addTask st $ Task name Month now
+    List p -> (listTasks st p now) >> return st
+    Mark n -> return $ markTask st n now
+    Monthly name -> return $ addTask st $ Task name Month now
     ParseFailure -> putStrLn "Unrecgonised/incomplete command" >> return st
     QuitUnsafe -> exitSuccess
     Quit -> quitSafe st
-    Rename n s -> renameTask st n s
-    Renumber -> renumberTasks st
-    Retime n -> retimeTask st n
+    Rename n s -> return $ renameTask st n s
+    Renumber -> return $ renumberTasks st
+    Retime n -> return $ retimeTask st n
     Save -> saveTasks st
-    Swap a b -> swapTasks st a b
-    Weekly name -> addTask st $ Task name Week now
+    Swap a b -> return $ swapTasks st a b
+    Weekly name -> return $ addTask st $ Task name Week now
 --    _ -> putStrLn "Unimplemented" >> return st
 
 announce :: Task -> IO Task
@@ -137,7 +135,7 @@ loadTasks :: HTHState -> IO HTHState
 loadTasks st = do
   taskString <- catch (readFile "habits") (\(SomeException _) -> return "")
   taskStrings <- sequence $ announce <$> read <$> lines taskString
-  new <- foldM addTask st taskStrings
+  let new = foldl addTask st taskStrings
   return new{isModified = False}
 
 setup :: IO HTHState
