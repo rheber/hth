@@ -7,7 +7,7 @@ import System.IO (stdout)
 
 import Command
 import Parser (parseExpr)
-import Time (TimePeriod(..), dummyTime, timeAfter)
+import Time (TimePeriod(..), dummyTime, atCurrentTime, timeAfter)
 
 data Task = Task String TimePeriod UTCTime deriving (Read, Show)
 dummyTask = Task "" AnyTime dummyTime
@@ -125,16 +125,16 @@ evalExpr st input = do
     Weekly name -> return $ addTask st $ Task name Week now
 --    _ -> putStrLn "Unimplemented" >> return st
 
-announce :: Task -> IO Task
-announce task@(Task name _ _) = do
-  now <- getCurrentTime
+announce :: Task -> UTCTime -> IO Task
+announce task@(Task name _ _) now = do
   if isUrgent now task then putStrLn ("Outstanding task: " ++ name) else return ()
   return task
 
 loadTasks :: HTHState -> IO HTHState
 loadTasks st = do
   taskString <- catch (readFile "habits") (\(SomeException _) -> return "")
-  taskStrings <- sequence $ announce <$> read <$> lines taskString
+  taskStrings <- sequence $ (atCurrentTime . announce) <$>
+    read <$> lines taskString
   let new = foldl addTask st taskStrings
   return new{isModified = False}
 
