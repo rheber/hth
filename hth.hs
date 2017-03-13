@@ -124,16 +124,15 @@ evalExpr st input = do
     Weekly name -> return $ addTask st $ Task name Week now
 --    _ -> putStrLn "Unimplemented" >> return st
 
-announce :: Task -> UTCTime -> IO Task
-announce task@(Task name _ _) now = do
+announce :: Task -> UTCTime -> IO ()
+announce task@(Task name _ _) now =
   if isUrgent now task then putStrLn ("Outstanding task: " ++ name) else return ()
-  return task
 
 loadTasks :: HTHState -> IO HTHState
 loadTasks st = do
   taskString <- catch (readFile "habits") (\(SomeException _) -> return "")
-  taskStrings <- sequence $ (atCurrentTime . announce) <$>
-    read <$> lines taskString
+  let taskStrings = read <$> lines taskString
+  sequence $ (atCurrentTime . announce) <$> taskStrings
   let new = foldl addTask st taskStrings
   return new{isModified = False}
 
