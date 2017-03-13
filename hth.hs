@@ -1,5 +1,5 @@
 import Control.Exception (SomeException(..), catch)
-import Data.Time (UTCTime, getCurrentTime)
+import Data.Time (UTCTime)
 import qualified Data.Map.Lazy as Map
 import GHC.IO.Handle (hFlush)
 import System.Exit (exitSuccess)
@@ -104,9 +104,8 @@ swapTasks (HTHState i _ m) a b = let
 
 {- Setup and repl functions. -}
 
-evalExpr :: HTHState -> Command -> IO HTHState
-evalExpr st input = do
-  now <- getCurrentTime
+evalExpr :: HTHState -> Command -> UTCTime -> IO HTHState
+evalExpr st input now = do
   case input of
     Delete n -> return $ deleteTask st n
     Help -> helpPrint >> return st
@@ -144,7 +143,7 @@ repl st =
   putStr "hth> " >>
   hFlush stdout >>
   getLine >>=
-  \input -> (evalExpr st $ parseExpr input) >>=
+  \input -> atCurrentTime (evalExpr st $ parseExpr input) >>=
   \newState -> repl newState
 
 main :: IO HTHState
