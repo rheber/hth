@@ -1,4 +1,4 @@
-import Control.Exception hiding (try)
+import Control.Exception (SomeException(..), catch)
 import Data.Time (UTCTime, getCurrentTime)
 import qualified Data.Map.Lazy as Map
 import GHC.IO.Handle (hFlush)
@@ -51,8 +51,7 @@ helpPrint = do
   putStrLn ""
 
 pad :: Int -> String
-pad n | n < 10 = ' ':show n
-pad n = show n
+pad n = if n < 10 then (' ':show n) else show n
 
 listTaskString :: Int -> String -> UTCTime -> UTCTime -> String
 listTaskString n name deadline now =
@@ -150,4 +149,4 @@ repl st =
   \newState -> repl newState
 
 main :: IO HTHState
-main = setup >>= \s -> repl s
+main = setup >>= repl
