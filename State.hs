@@ -4,6 +4,7 @@ import Control.Exception (SomeException(..), catch)
 import qualified Data.Map.Lazy as Map
 import Data.Time (UTCTime)
 import System.Exit (exitSuccess)
+import System.FilePath (combine)
 
 import qualified Command as Cm
 import Time (TimePeriod(..), atCurrentTime, timeAfter)
@@ -18,12 +19,15 @@ State which includes:
 -}
 data HTHState = HTHState {
   counter :: Int,
-  habitsFilename :: String,
-  habitsFolder :: String,
+  configFilename :: String,
+  configFolder :: String,
   isModified :: Bool,
   taskMap :: Map.Map Int Task
 } deriving Show
 emptyState = HTHState 1 "habits" "." True Map.empty
+
+habitsPath :: HTHState -> String
+habitsPath st = combine (configFolder st) $ configFilename st
 
 -- Low-level HTHState manipulation.
 
@@ -73,7 +77,7 @@ renameTask st i name = let
   in markModified $ taskMapAdjust modify i st
 
 renumberTasks :: HTHState -> HTHState
-renumberTasks st = foldl addTask emptyState $ taskMap st
+renumberTasks st = foldl addTask (copyConfig emptyState st) $ taskMap st
 
 retimeTask :: HTHState -> Int -> HTHState
 retimeTask st i = let
@@ -83,7 +87,7 @@ retimeTask st i = let
 
 saveTasks :: HTHState -> IO HTHState
 saveTasks st =
-  writeFile (habitsFilename st) (concatMap (++ "\n") $ show <$> taskMap st) >>
+  writeFile (habitsPath st) (concatMap (++ "\n") $ show <$> taskMap st) >>
   return st{isModified = False}
 
 swapTasks :: HTHState -> Int -> Int -> HTHState
@@ -130,14 +134,17 @@ evalExpr st input now = do
     Cm.Weekly name -> return $ addTask st $ Task name Week now
 --    _ -> putStrLn "Unimplemented" >> return st
 
+copyConfig :: HTHState -> HTHState -> HTHState
+copyConfig st cfg = let
+  filename = configFilename cfg
+  folder = configFolder cfg
+  in st{configFilename = filename, configFolder = folder}
+
 loadTasks :: HTHState -> IO HTHState
 loadTasks st = do
-  taskString <- catch (readFile $ habitsFilename st) $
+  taskString <- catch (readFile $ habitsPath st) $
     \(SomeException _) -> return ""
   let taskStrings = read <$> lines taskString
   sequence $ (atCurrentTime . announce) <$> taskStrings
   let new = foldl addTask st taskStrings
   return new{isModified = False}
-
-setupState :: IO HTHState
-setupState = loadTasks emptyState
