@@ -2,18 +2,19 @@ import GHC.IO.Handle (hFlush)
 import System.IO (stdout)
 
 import Parser (parseExpr)
-import State (HTHState(..), configureState, evalExpr, loadTasks, emptyState)
+import State (HTHState(..), IOS(..),
+  configureState, evalExpr, loadTasks, emptyState)
 import Time (atCurrentTime)
 
 setupState :: IO HTHState
 setupState = loadTasks =<< configureState emptyState
 
-repl :: HTHState -> IO HTHState
+repl :: IOS HTHState
 repl st =
   putStr "hth> " >>
   hFlush stdout >>
   getLine >>=
-  \input -> atCurrentTime (evalExpr st $ parseExpr input) >>=
+  \input -> atCurrentTime (\t -> evalExpr (parseExpr input) t st) >>=
   \newState -> repl newState
 
 main :: IO HTHState

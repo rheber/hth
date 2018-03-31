@@ -11,6 +11,9 @@ import Config (Config(..), defaultConfig, makeConfig)
 import Time (TimePeriod(..), atCurrentTime, timeAfter)
 import Task (Task(..), announce, dummyTask, listTask)
 
+-- Function which changes its argument with some IO.
+type IOS a = a -> IO a
+
 {-
 State which includes:
 * next task ID to be assigned
@@ -27,7 +30,7 @@ data HTHState = HTHState {
 emptyState = HTHState 1 defaultConfig True Map.empty
 
 -- Add config to state.
-configureState :: HTHState -> IO HTHState
+configureState :: IOS HTHState
 configureState st = do
   cfg <- makeConfig
   return st{config = cfg}
@@ -74,7 +77,7 @@ markTask st i now = let
   modify (Task s p t) = Task s p $ timeAfter p now
   in markModified $ taskMapAdjust modify i st
 
-quitSafe :: HTHState -> IO HTHState
+quitSafe :: IOS HTHState
 quitSafe st =
   if isModified st
   then putStrLn "Unsaved changes, either 'save' or 'quit!'" >> return st
@@ -94,7 +97,7 @@ retimeTask st i = let
   modify (Task s Month t) = Task s Week t
   in markModified $ taskMapAdjust modify i st
 
-saveTasks :: HTHState -> IO HTHState
+saveTasks :: IOS HTHState
 saveTasks st =
   writeFile (habitsPath st) (concatMap (++ "\n") $ show <$> taskMap st) >>
   return st{isModified = False}
@@ -124,8 +127,8 @@ helpPrint = do
   putStrLn "weekly <name>\t\tAdd new weekly task"
   putStrLn ""
 
-evalExpr :: HTHState -> Cm.Command -> UTCTime -> IO HTHState
-evalExpr st input now = do
+evalExpr :: Cm.Command -> UTCTime -> IOS HTHState
+evalExpr input now st = do
   case input of
     Cm.Delete n -> return $ deleteTask st n
     Cm.Help -> helpPrint >> return st
@@ -146,7 +149,7 @@ evalExpr st input now = do
 copyConfig :: HTHState -> HTHState -> HTHState
 copyConfig st cfg = st{config = config cfg}
 
-loadTasks :: HTHState -> IO HTHState
+loadTasks :: IOS HTHState
 loadTasks st = do
   taskString <- catch (readFile $ habitsPath st) $
     \(SomeException _) -> return ""
