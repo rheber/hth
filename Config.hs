@@ -8,8 +8,6 @@ import GHC.Generics
 import System.Directory (findFile)
 import System.Environment (lookupEnv)
 
-import State (HTHState(..))
-
 data Config =
   Config {habitsFilename :: String, habitsFolder :: String}
   deriving (Generic, Show)
@@ -45,11 +43,3 @@ makeConfig = do
   case file of
     Nothing -> return defaultConfig
     (Just filename) -> configRead filename
-
--- Add config to state.
-configureState :: HTHState -> IO HTHState
-configureState st = do
-  cfg <- makeConfig
-  let filename = habitsFilename cfg
-  let folder = habitsFolder cfg
-  return st{configFilename = filename, configFolder = folder}

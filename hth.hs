@@ -1,9 +1,8 @@
 import GHC.IO.Handle (hFlush)
 import System.IO (stdout)
 
-import Config (configureState)
 import Parser (parseExpr)
-import State (HTHState(..), evalExpr, loadTasks, emptyState)
+import State (HTHState(..), configureState, evalExpr, loadTasks, emptyState)
 import Time (atCurrentTime)
 
 setupState :: IO HTHState

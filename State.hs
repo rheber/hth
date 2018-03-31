@@ -7,6 +7,7 @@ import System.Exit (exitSuccess)
 import System.FilePath (combine)
 
 import qualified Command as Cm
+import Config (Config(..), defaultConfig, makeConfig)
 import Time (TimePeriod(..), atCurrentTime, timeAfter)
 import Task (Task(..), announce, dummyTask, listTask)
 
@@ -19,12 +20,20 @@ State which includes:
 -}
 data HTHState = HTHState {
   counter :: Int,
-  configFilename :: String,
-  configFolder :: String,
+  config :: Config,
   isModified :: Bool,
   taskMap :: Map.Map Int Task
 } deriving Show
-emptyState = HTHState 1 "habits" "." True Map.empty
+emptyState = HTHState 1 defaultConfig True Map.empty
+
+-- Add config to state.
+configureState :: HTHState -> IO HTHState
+configureState st = do
+  cfg <- makeConfig
+  return st{config = cfg}
+
+configFolder = habitsFolder . config
+configFilename = habitsFilename . config
 
 habitsPath :: HTHState -> String
 habitsPath st = combine (configFolder st) $ configFilename st
@@ -135,10 +144,7 @@ evalExpr st input now = do
 --    _ -> putStrLn "Unimplemented" >> return st
 
 copyConfig :: HTHState -> HTHState -> HTHState
-copyConfig st cfg = let
-  filename = configFilename cfg
-  folder = configFolder cfg
-  in st{configFilename = filename, configFolder = folder}
+copyConfig st cfg = st{config = config cfg}
 
 loadTasks :: HTHState -> IO HTHState
 loadTasks st = do
