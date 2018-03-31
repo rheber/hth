@@ -31,9 +31,7 @@ emptyState = HTHState 1 defaultConfig True Map.empty
 
 -- Add config to state.
 configureState :: IOS HTHState
-configureState st = do
-  cfg <- makeConfig
-  return st{config = cfg}
+configureState st = makeConfig >>= \cfg -> return st{config = cfg}
 
 configFolder = habitsFolder . config
 configFilename = habitsFilename . config
@@ -128,7 +126,7 @@ helpPrint = do
   putStrLn ""
 
 evalExpr :: Cm.Command -> UTCTime -> IOS HTHState
-evalExpr input now st = do
+evalExpr input now st =
   case input of
     Cm.Delete n -> return $ deleteTask st n
     Cm.Help -> helpPrint >> return st

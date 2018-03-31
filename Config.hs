@@ -18,28 +18,22 @@ defaultConfig = Config{habitsFilename = "habits", habitsFolder = "."}
 
 -- Read config from file.
 configRead :: String -> IO Config
-configRead filename = do
-  cfgString <- BS.readFile filename
-  return $ maybe defaultConfig id $ Aeson.decode cfgString
+configRead filename =
+  BS.readFile filename >>=
+  return . (maybe defaultConfig id) . Aeson.decode
 
 -- Look for config file in current directory or Path.
 findConfig :: IO (Maybe String)
-findConfig = do
-  path <- lookupEnv "PATH"
-  case path of
-    Nothing -> searchPaths "."
-    (Just folders) -> searchPaths $ ".;" ++ folders
+findConfig =
+  lookupEnv "PATH" >>= maybe (searchPaths ".") (searchPaths . (".;"++))
 
 -- Helper function for findConfig.
+-- Not tested on Unix.
 searchPaths :: String -> IO (Maybe String)
-searchPaths path = do
-  let folders = splitOn ";" path -- Not tested on Unix.
-  findFile folders "hth.json"
+searchPaths path =
+  let folders = splitOn ";" path
+  in findFile folders "hth.json"
 
 -- Make config, using file if found in current directory or Path.
 makeConfig :: IO Config
-makeConfig = do
-  file <- findConfig
-  case file of
-    Nothing -> return defaultConfig
-    (Just filename) -> configRead filename
+makeConfig = findConfig >>= maybe (return defaultConfig) configRead
